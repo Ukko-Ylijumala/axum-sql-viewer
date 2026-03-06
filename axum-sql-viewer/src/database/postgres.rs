@@ -6,7 +6,7 @@ use crate::schema::{
     SortOrder, TableInfo, TableSchema,
 };
 use async_trait::async_trait;
-use sqlx::{postgres::PgRow, Column, PgPool, Row, TypeInfo};
+use sqlx::{postgres::PgRow, AssertSqlSafe, Column, PgPool, Row, TypeInfo};
 use std::collections::HashMap;
 
 /// PostgreSQL database provider
@@ -165,7 +165,7 @@ impl DatabaseProvider for PostgresProvider {
                 "SELECT COUNT(*) as count FROM {}",
                 Self::quote_identifier(&name)
             );
-            let row_count: Option<u64> = sqlx::query_scalar(&count_query)
+            let row_count: Option<u64> = sqlx::query_scalar(AssertSqlSafe(count_query))
                 .fetch_one(&self.pool)
                 .await
                 .ok()
@@ -367,7 +367,7 @@ impl DatabaseProvider for PostgresProvider {
         sql.push_str(&format!(" LIMIT {} OFFSET {}", limit, query.offset));
 
         // Execute query
-        let mut query_builder = sqlx::query(&sql);
+        let mut query_builder = sqlx::query(AssertSqlSafe(sql));
         for value in &filter_values {
             query_builder = query_builder.bind(value);
         }
@@ -405,7 +405,7 @@ impl DatabaseProvider for PostgresProvider {
         sql.push_str(&where_clause);
 
         // Execute query
-        let mut query_builder = sqlx::query(&sql);
+        let mut query_builder = sqlx::query(AssertSqlSafe(sql));
         for value in &filter_values {
             query_builder = query_builder.bind(value);
         }
@@ -422,7 +422,7 @@ impl DatabaseProvider for PostgresProvider {
         let start_time = std::time::Instant::now();
 
         // Try to execute as a query that returns rows (SELECT)
-        let result = sqlx::query(sql).fetch_all(&self.pool).await;
+        let result = sqlx::query(AssertSqlSafe(sql.to_string())).fetch_all(&self.pool).await;
 
         let execution_time_milliseconds = start_time.elapsed().as_millis() as u64;
 

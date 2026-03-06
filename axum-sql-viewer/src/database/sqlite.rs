@@ -8,7 +8,7 @@ use crate::schema::{
 use async_trait::async_trait;
 use serde_json::Value;
 use sqlx::sqlite::SqliteRow;
-use sqlx::{Column, Row, SqlitePool, TypeInfo, ValueRef};
+use sqlx::{AssertSqlSafe, Column, Row, SqlitePool, TypeInfo, ValueRef};
 use std::time::Instant;
 
 /// SQLite database provider
@@ -202,7 +202,7 @@ impl DatabaseProvider for SqliteProvider {
 
             // Optionally get row count for each table
             let count_query = format!("SELECT COUNT(*) as count FROM {}", Self::quote_identifier(&name));
-            let row_count: Option<u64> = sqlx::query_scalar(&count_query)
+            let row_count: Option<u64> = sqlx::query_scalar(AssertSqlSafe(count_query))
                 .fetch_one(&self.pool)
                 .await
                 .ok()
@@ -217,7 +217,7 @@ impl DatabaseProvider for SqliteProvider {
     async fn get_table_schema(&self, table: &str) -> Result<TableSchema, DatabaseError> {
         // Get column information using PRAGMA table_info
         let table_info_query = format!("PRAGMA table_info({})", Self::quote_identifier(table));
-        let column_rows = sqlx::query(&table_info_query)
+        let column_rows = sqlx::query(AssertSqlSafe(table_info_query))
             .fetch_all(&self.pool)
             .await?;
 
@@ -261,7 +261,7 @@ impl DatabaseProvider for SqliteProvider {
 
         // Get foreign key information using PRAGMA foreign_key_list
         let foreign_key_query = format!("PRAGMA foreign_key_list({})", Self::quote_identifier(table));
-        let foreign_key_rows = sqlx::query(&foreign_key_query)
+        let foreign_key_rows = sqlx::query(AssertSqlSafe(foreign_key_query))
             .fetch_all(&self.pool)
             .await?;
 
@@ -281,7 +281,7 @@ impl DatabaseProvider for SqliteProvider {
 
         // Get index information using PRAGMA index_list
         let index_list_query = format!("PRAGMA index_list({})", Self::quote_identifier(table));
-        let index_rows = sqlx::query(&index_list_query)
+        let index_rows = sqlx::query(AssertSqlSafe(index_list_query))
             .fetch_all(&self.pool)
             .await?;
 
@@ -293,7 +293,7 @@ impl DatabaseProvider for SqliteProvider {
 
             // Get columns in this index using PRAGMA index_info
             let index_info_query = format!("PRAGMA index_info({})", Self::quote_identifier(&index_name));
-            let index_column_rows = sqlx::query(&index_info_query)
+            let index_column_rows = sqlx::query(AssertSqlSafe(index_info_query))
                 .fetch_all(&self.pool)
                 .await?;
 
@@ -355,7 +355,7 @@ impl DatabaseProvider for SqliteProvider {
             where_clause
         );
 
-        let mut count_sql_query = sqlx::query_scalar::<_, i64>(&count_query);
+        let mut count_sql_query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(count_query));
         for value in &filter_values {
             count_sql_query = count_sql_query.bind(value);
         }
@@ -371,7 +371,7 @@ impl DatabaseProvider for SqliteProvider {
         );
 
         // Build and execute query with bindings
-        let mut sql_query = sqlx::query(&select_query);
+        let mut sql_query = sqlx::query(AssertSqlSafe(select_query));
         for value in &filter_values {
             sql_query = sql_query.bind(value);
         }
@@ -433,7 +433,7 @@ impl DatabaseProvider for SqliteProvider {
             where_clause
         );
 
-        let mut sql_query = sqlx::query_scalar::<_, i64>(&count_query);
+        let mut sql_query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(count_query));
         for value in &filter_values {
             sql_query = sql_query.bind(value);
         }
@@ -464,7 +464,7 @@ impl DatabaseProvider for SqliteProvider {
             // For SELECT queries, fetch all rows
             let result = tokio::time::timeout(
                 std::time::Duration::from_secs(QUERY_TIMEOUT_SECONDS),
-                sqlx::query(sql).fetch_all(&self.pool),
+                sqlx::query(AssertSqlSafe(sql.to_string())).fetch_all(&self.pool),
             )
             .await;
 
@@ -521,7 +521,7 @@ impl DatabaseProvider for SqliteProvider {
             // For INSERT/UPDATE/DELETE, use execute() to get affected rows
             let result = tokio::time::timeout(
                 std::time::Duration::from_secs(QUERY_TIMEOUT_SECONDS),
-                sqlx::query(sql).execute(&self.pool),
+                sqlx::query(AssertSqlSafe(sql.to_string())).execute(&self.pool),
             )
             .await;
 
