@@ -1,3 +1,11 @@
-target
 node_modules
 example-server/data
+
+# Rust section
+target/
+Cargo.lock
+
+# Profiling etc:
+*.log
+perf.data*
+heaptrack.*
